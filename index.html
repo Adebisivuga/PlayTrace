@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PlayTrace</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+/* Layout: sticky top bar, one view at a time (hash routes), wide editorial hero with a lit product stage and a live demo log. */
+:root{
+  --bg:#F3F4F5; --surface:#FFFFFF; --ink:#0F1214; --mute:#566069; --line:#DADFE3;
+  --accent:#12B8C6; --accent-ink:#06727D; --on-accent:#03282C; --soft:#E7F6F8;
+  --ok:#1E8E5A; --warn:#B26A00;
+  --display:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  --body:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"DM Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0B0D0F; --surface:#13171A; --ink:#ECEFF1; --mute:#9AA5AE; --line:#252B30;
+  --accent:#2BD4E3; --accent-ink:#2BD4E3; --on-accent:#03282C; --soft:#0F2428;
+  --ok:#47C98A; --warn:#E3A23A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B0D0F; --surface:#13171A; --ink:#ECEFF1; --mute:#9AA5AE; --line:#252B30;
+  --accent:#2BD4E3; --accent-ink:#2BD4E3; --on-accent:#03282C; --soft:#0F2428;
+  --ok:#47C98A; --warn:#E3A23A; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+a{color:inherit}
+h1,h2,h3{font-family:var(--display);line-height:1.05;margin:0;text-wrap:balance;letter-spacing:-.02em}
+h1{font-size:clamp(2.6rem,7.4vw,5.6rem);font-weight:800}
+h2{font-size:clamp(1.8rem,4vw,3rem);font-weight:700}
+h3{font-size:1.25rem;font-weight:700;letter-spacing:-.01em}
+p{margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.mono{font-family:var(--mono);font-size:.78rem;letter-spacing:.04em}
+.eyebrow{font-family:var(--mono);font-size:.76rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink)}
+.lede{font-size:1.15rem;color:var(--mute);max-width:56ch}
+.sm{font-size:.88rem;color:var(--mute)}
+
+/* top bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line);margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:0 max(16px,env(safe-area-inset-left,0px))}
+.bar .wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:800;font-size:1.3rem;text-decoration:none;letter-spacing:-.02em}
+.brand svg{width:28px;height:28px}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+nav a{padding:8px 12px;border-radius:999px;text-decoration:none;font-weight:500;font-size:.95rem;color:var(--mute)}
+nav a:hover{color:var(--ink)}
+nav a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.btn{display:inline-flex;align-items:center;gap:8px;padding:13px 20px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:var(--bg);font:600 .98rem var(--body);text-decoration:none;cursor:pointer}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn:hover{filter:brightness(1.08)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+
+section.view{padding-block:48px 72px}
+.band{padding-block:56px;border-top:1px solid var(--line)}
+.head{display:grid;gap:14px;margin-bottom:32px;max-width:760px}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:40px;align-items:center}
+.hero h1 em{font-style:normal;color:var(--accent-ink)}
+.stage{background:#fff;border-radius:28px;border:1px solid var(--line);position:relative;overflow:hidden;aspect-ratio:1/1;max-width:100%}
+.stage img{width:100%;height:100%;object-fit:contain;display:block}
+.pulse{position:absolute;left:57.5%;top:79.5%;width:14px;height:14px;margin:-7px;border-radius:50%;border:2px solid #19cfe0;animation:ping 2.4s ease-out infinite;pointer-events:none}
+@keyframes ping{0%{transform:scale(.6);opacity:.9}100%{transform:scale(4.2);opacity:0}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none;opacity:0}}
+.log{margin-top:18px;border:1px solid var(--line);background:var(--surface);border-radius:18px;padding:14px 16px}
+.log header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:8px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:8px}
+.log ol{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.log li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;padding:8px 0;border-top:1px solid var(--line);align-items:baseline}
+.log li b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log li .t{color:var(--mute)}
+.tag{font-family:var(--mono);font-size:.72rem;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--accent-ink);white-space:nowrap}
+.tag.skip{background:transparent;border:1px solid var(--line);color:var(--mute)}
+
+/* who gets what */
+.who{display:grid;gap:0;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:var(--surface)}
+.who a{display:grid;grid-template-columns:160px minmax(0,1fr) auto;gap:20px;padding:20px 24px;text-decoration:none;border-top:1px solid var(--line);align-items:center}
+.who a:first-child{border-top:0}
+.who a:hover{background:var(--soft)}
+.who strong{font-family:var(--display);font-size:1.2rem}
+.who span.go{font-family:var(--mono);color:var(--accent-ink)}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border-top:2px solid var(--ink)}
+.step{padding:20px 20px 0 0;display:grid;gap:8px;align-content:start}
+.step .n{font-family:var(--mono);color:var(--accent-ink)}
+.step+.step{padding-left:20px;border-left:1px solid var(--line)}
+
+/* product */
+.prod{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:40px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:4px;background:var(--surface);gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;color:var(--mute);padding:8px 16px;border-radius:999px;font:500 .92rem var(--body);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.specs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:22px 0 0;padding:0;list-style:none}
+.specs li{padding:14px 0;border-top:1px solid var(--line);padding-right:16px}
+.specs li b{display:block;font-family:var(--display)}
+.specs li span{color:var(--mute);font-size:.92rem}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:28px}
+.never{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.never div{border-top:2px solid var(--ink);padding-top:12px;display:grid;gap:6px}
+
+/* bill */
+.bill{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px;font-family:var(--mono);font-size:.86rem;max-width:460px}
+.bill .l{display:flex;justify-content:space-between;gap:16px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.bill .l.t{border-bottom:0;border-top:2px solid var(--ink);margin-top:6px;padding-top:12px;font-weight:500;font-size:1rem}
+.bill h4{margin:0 0 12px;font:700 1.1rem var(--display)}
+.cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px;align-items:start}
+.cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+
+/* forms */
+form{display:grid;gap:14px}
+label{display:grid;gap:6px;font-weight:600;font-size:.92rem}
+input,select,textarea{font:400 1rem var(--body);padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-width:0;width:100%}
+input[type=range]{padding:0;accent-color:var(--accent)}
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.status{min-height:1.4em;font-size:.92rem;color:var(--ok)}
+.big{font-family:var(--display);font-weight:800;font-size:clamp(2.2rem,5vw,3.4rem);letter-spacing:-.03em;line-height:1}
+.kv{display:grid;gap:2px}
+.stackbar{display:flex;height:44px;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.stackbar div{display:grid;place-items:center;font:500 .74rem var(--mono);color:#fff;min-width:0;overflow:hidden}
+.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;margin-top:14px;font-size:.9rem}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:520px}
+th,td{text-align:left;padding:12px 16px;border-top:1px solid var(--line);vertical-align:top;font-size:.94rem}
+thead th{border-top:0;font:500 .74rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.list{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.list li{padding-left:22px;position:relative}
+.list li::before{content:"";position:absolute;left:0;top:.6em;width:10px;height:2px;background:var(--accent-ink)}
+footer{border-top:1px solid var(--line);padding-block:36px 56px}
+footer .wrap{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:32px}
+.copy{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;padding:2px 10px;font:500 .78rem var(--mono);cursor:pointer;margin-left:8px}
+.notice{background:var(--soft);border-radius:12px;padding:12px 16px;font-size:.9rem}
+.ladder{display:grid;gap:0}
+.ladder div{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;padding:14px 0;border-top:1px solid var(--line)}
+.ladder b{font-family:var(--display)}
+
+@media (max-width:860px){
+  .hero,.prod,.cols2,footer .wrap{grid-template-columns:minmax(0,1fr)}
+  .steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .step:nth-child(3){padding-left:0;border-left:0}
+  .step{padding-bottom:20px}
+  .never,.cols3{grid-template-columns:minmax(0,1fr)}
+  .who a{grid-template-columns:minmax(0,1fr);gap:4px}
+  .who span.go{display:none}
+  nav{margin-left:0}
+}
+@media (max-width:520px){
+  .fgrid,.specs,.legend{grid-template-columns:minmax(0,1fr)}
+  .steps{grid-template-columns:minmax(0,1fr)}
+  .step+.step{padding-left:0;border-left:0}
+  .ladder div{grid-template-columns:minmax(0,1fr);gap:2px}
+}
+</style>
+
+</head>
+<body>
+<header class="bar"><div class="wrap">
+  <a class="brand" href="#home" aria-label="PlayTrace home">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/><circle cx="21" cy="23" r="3" fill="var(--accent)"/></svg>
+    PlayTrace
+  </a>
+  <nav aria-label="Main">
+    <a href="#home" data-r="home">Home</a>
+    <a href="#venues" data-r="venues">Venues</a>
+    <a href="#agents" data-r="agents">Zone agents</a>
+    <a href="#artists" data-r="artists">Artists</a>
+    <a href="#partners" data-r="partners">MCSN and government</a>
+  </nav>
+</div></header>
+
+<main class="wrap">
+
+<!-- HOME -->
+<section class="view" id="v-home">
+  <div class="hero">
+    <div style="display:grid;gap:24px">
+      <p class="eyebrow">Music measurement for Nigerian venues</p>
+      <h1>Every song played, <em>paid</em> to the right artist.</h1>
+      <p class="lede">PlayTrace is a slim disc on your wall or ceiling. It listens for registered music, logs what plays and for how long, and turns it into one monthly music bill for the venue and a fair payout for the artist.</p>
+      <div class="row">
+        <a class="btn accent" href="#venues">Get a device for your venue</a>
+        <a class="btn ghost" href="#agents">Become a zone agent</a>
+      </div>
+      <p class="sm">Working prototype. Figures and tracks on this site are examples.</p>
+    </div>
+    <div>
+      <div class="stage"><img id="heroImg" src="img/prod_white.png" alt="PlayTrace disc in white with a cyan status light"><span class="pulse"></span></div>
+      <div class="log" aria-live="off">
+        <header><span class="mono"><span class="dot"></span>NOW LISTENING · DEMO LOUNGE, LEKKI</span><span class="mono" id="logCount">0 matched today</span></header>
+        <ol id="logList"></ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="b-who">
+  <div class="head"><p class="eyebrow">One system, five winners</p><h2>Everyone who has to say yes gets something they can count.</h2></div>
+  <div class="who">
+    <a href="#partners"><strong>MCSN</strong><span>More venues licensed and paid on time, with play data behind every distribution.</span><span class="go">See the pilot →</span></a>
+    <a href="#partners"><strong>Government and NCC</strong><span>Enforcement without a new army of inspectors, tax revenue and formal youth jobs.</span><span class="go">See the case →</span></a>
+    <a href="#agents"><strong>Zone agents</strong><span>Young music lovers own a territory of 10 or more venues and earn for keeping them live.</span><span class="go">Apply →</span></a>
+    <a href="#venues"><strong>Venues</strong><span>One licence, one monthly bill, proof of compliance to show an inspector.</span><span class="go">Get a quote →</span></a>
+    <a href="#artists"><strong>Artists</strong><span>Free registration. Old hits that play five nights a week finally show up as money.</span><span class="go">Register music →</span></a>
+  </div>
+</section>
+
+<section class="band" id="b-how">
+  <div class="head"><p class="eyebrow">How it works</p><h2>From a registered song to a payment, in four steps.</h2></div>
+  <div class="steps">
+    <div class="step"><span class="n">STEP 1</span><h3>Register</h3><p class="sm">Artists, managers, labels and publishers add works to the library, linked to their MCSN membership. Free for artists.</p></div>
+    <div class="step"><span class="n">STEP 2</span><h3>Install</h3><p class="sm">A local agent signs up the venue. The disc clips onto a magnetic plate screwed to the wall or ceiling.</p></div>
+    <div class="step"><span class="n">STEP 3</span><h3>Listen</h3><p class="sm">The device identifies registered tracks only and reports over its own SIM. A tamper alert and GPS show if it moves.</p></div>
+    <div class="step"><span class="n">STEP 4</span><h3>Bill and pay</h3><p class="sm">The venue pays one bill each month. MCSN pays rights holders using the measured plays.</p></div>
+  </div>
+</section>
+
+<section class="band" id="b-product">
+  <div class="prod">
+    <div>
+      <div class="stage"><img id="prodImg" src="img/prod_white.png" alt="PlayTrace disc"></div>
+    </div>
+    <div style="display:grid;gap:20px">
+      <p class="eyebrow">The device</p>
+      <h2>A disc that fits the room, not the other way round.</h2>
+      <div class="seg" role="group" aria-label="Finish">
+        <button type="button" data-f="white" aria-pressed="true">White</button>
+        <button type="button" data-f="grey" aria-pressed="false">Grey</button>
+        <button type="button" data-f="black" aria-pressed="false">Black</button>
+        <button type="button" data-f="inside" aria-pressed="false">Inside</button>
+      </div>
+      <p id="finishNote" class="sm">White finish. All three colours come from the plastic itself, so every venue gets the same tested hardware.</p>
+      <ul class="specs">
+        <li><b>Wall or ceiling</b><span>One body, magnetic plate, hidden lock</span></li>
+        <li><b>Own SIM and GPS</b><span>Reports on its own, shows if it is moved</span></li>
+        <li><b>Tamper aware</b><span>Alerts on removal, cover and power loss</span></li>
+        <li><b>Registered music only</b><span>Everything else is ignored</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="b-privacy">
+  <div class="head"><p class="eyebrow">Privacy by design</p><h2>It identifies songs. It does not record people.</h2></div>
+  <div class="never">
+    <div><h3>No conversations</h3><p class="sm">Speech is filtered out before anything is kept. Only a short music fingerprint is made.</p></div>
+    <div><h3>No raw audio stored</h3><p class="sm">The fingerprint is matched and discarded. Nothing is stored that could be played back.</p></div>
+    <div><h3>No customer data</h3><p class="sm">The log holds track, time and duration. Built to follow the Nigeria Data Protection Act 2023.</p></div>
+  </div>
+</section>
+
+<section class="band" id="b-bill">
+  <div class="cols2">
+    <div style="display:grid;gap:18px">
+      <p class="eyebrow">The monthly music bill</p>
+      <h2>One bill. No surprise visits.</h2>
+      <p class="lede">The venue pays the MCSN licence fee and the PlayTrace service fee together, and gets a statement of what played. Licence fees go to MCSN. PlayTrace never sets them.</p>
+      <div class="row"><a class="btn" href="#venues">Work out your bill</a></div>
+    </div>
+    <div class="bill" role="img" aria-label="Sample monthly music bill">
+      <h4>Music bill · October</h4>
+      <div class="l"><span>Demo Lounge, Lekki</span><span>Mid-size bar</span></div>
+      <div class="l"><span>Registered tracks heard</span><span>1,284</span></div>
+      <div class="l"><span>Hours of music</span><span>212 h</span></div>
+      <div class="l"><span>MCSN licence fee</span><span>$35.00</span></div>
+      <div class="l"><span>PlayTrace service</span><span>$12.00</span></div>
+      <div class="l t"><span>Total</span><span>$47.00</span></div>
+      <p class="sm" style="margin-top:12px;font-family:var(--body)">Sample only. Real amounts follow MCSN tariffs.</p>
+    </div>
+  </div>
+</section>
+
+<!-- VENUES -->
+<section class="view" id="v-venues" hidden>
+  <div class="head"><p class="eyebrow">For venues</p><h1 style="font-size:clamp(2.2rem,5.5vw,4rem)">Cafes, bars, restaurants, salons, gyms, shops and hotels.</h1><p class="lede">If you play music for customers, the Copyright Act 2022 expects you to be licensed. PlayTrace makes that one monthly bill. Event venues are not covered.</p></div>
+  <div class="cols2">
+    <div class="panel" style="display:grid;gap:18px">
+      <h3>Estimate your monthly bill</h3>
+      <form id="calc" onsubmit="return false">
+        <div class="fgrid">
+          <label>Type of venue<select id="cType"><option value="18">Cafe</option><option value="18">Salon</option><option value="18">Shop</option><option value="28" selected>Restaurant</option><option value="28">Gym</option><option value="35">Bar</option><option value="60">Hotel</option><option value="80">Lounge or club</option></select></label>
+          <label>Size<select id="cSize"><option value="0.8">Small, under 30 seats</option><option value="1" selected>Medium, 30 to 100</option><option value="1.5">Large, over 100</option></select></label>
+        </div>
+        <label>Rooms with music <span class="sm" id="cRoomsV" style="font-weight:400">1</span><input type="range" id="cRooms" min="1" max="4" value="1"></label>
+      </form>
+      <div class="kv"><span class="mono">ESTIMATED MONTHLY BILL (USD)</span><span class="big" id="cTotal">$40</span></div>
+      <div id="cSplit" class="sm"></div>
+      <p class="notice">Illustrative. MCSN sets the real licence tariffs. The PlayTrace service fee shown is the planning figure, with VAT of 7.5% to be confirmed.</p>
+    </div>
+    <div class="panel" style="display:grid;gap:14px">
+      <h3>Request a device</h3>
+      <form id="venueForm">
+        <label>Venue name<input id="vName" required autocomplete="organization" value="Demo Lounge"></label>
+        <div class="fgrid">
+          <label>Area<select id="vArea"><option>Ikate-Elegushi</option><option>Lekki Phase 1</option><option>Victoria Island</option><option>Ikeja GRA</option><option>Yaba</option><option>Surulere</option><option>Ajah</option></select></label>
+          <label>Mounting<select id="vMount"><option>Wall</option><option>Ceiling</option></select></label>
+        </div>
+        <div class="fgrid">
+          <label>Finish<select id="vFinish"><option>White</option><option>Grey</option><option>Black</option></select></label>
+          <label>Phone<input id="vPhone" type="tel" autocomplete="tel" placeholder="0803 000 0000"></label>
+        </div>
+        <button class="btn accent" type="submit">Request installation</button>
+        <p class="status" id="vStatus" role="status"></p>
+      </form>
+    </div>
+  </div>
+  <div class="band" style="margin-top:48px">
+    <div class="cols3">
+      <div><h3>No hidden costs</h3><p class="sm">The device is ours. Your agent installs it, checks it and is your contact if anything stops working.</p></div>
+      <div><h3>Proof of compliance</h3><p class="sm">Your monthly statement shows what played and that your licence is up to date.</p></div>
+      <div><h3>You choose the colour</h3><p class="sm">White, grey or black, wall or ceiling, so it blends with your decor.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- AGENTS -->
+<section class="view" id="v-agents" hidden>
+  <div class="head"><p class="eyebrow">Zone agents</p><h1 style="font-size:clamp(2.2rem,5.5vw,4rem)">Be the person your neighbourhood venues call.</h1><p class="lede">Love music? Own a zone of 10 or more venues, make sure every device is live, and make sure artists get paid. You report and escalate. You do not seal premises or collect licence cash.</p></div>
+  <div class="cols2">
+    <div class="panel" style="display:grid;gap:18px">
+      <h3>What an agent earns</h3>
+      <label>Venues in your zone <span class="sm" id="aVV" style="font-weight:400">12</span><input type="range" id="aV" min="5" max="60" value="12"></label>
+      <label>New venues you sign in the first year <span class="sm" id="aNV" style="font-weight:400">4</span><input type="range" id="aN" min="0" max="30" value="4"></label>
+      <div class="kv"><span class="mono">ESTIMATED MONTHLY EARNINGS (USD)</span><span class="big" id="aTotal">$40</span></div>
+      <p class="sm" id="aNote"></p>
+      <p class="notice">Planning figures: $3 per active venue each month, plus a share of licence income from venues you newly bring in. Final pay is set in the pilot. Part-time at 10 to 15 venues, full-time at roughly 40 to 60.</p>
+    </div>
+    <div class="panel" style="display:grid;gap:14px">
+      <h3>Apply</h3>
+      <form id="agentForm">
+        <label>Full name<input id="agName" required autocomplete="name"></label>
+        <div class="fgrid">
+          <label>Your zone<select id="agZone"><option>Ikate-Elegushi</option><option>Lekki Phase 1</option><option>Victoria Island</option><option>Ikeja GRA</option><option>Yaba</option><option>Surulere</option><option>Ajah</option></select></label>
+          <label>Phone<input id="agPhone" type="tel" autocomplete="tel"></label>
+        </div>
+        <label>Why you love music<textarea id="agWhy" rows="3"></textarea></label>
+        <button class="btn accent" type="submit">Apply to be an agent</button>
+        <p class="status" id="agStatus" role="status"></p>
+      </form>
+    </div>
+  </div>
+  <div class="band" style="margin-top:48px">
+    <div class="head" style="margin-bottom:12px"><h2>What you do, and what you do not</h2></div>
+    <div class="cols2">
+      <ul class="list"><li>Visit venues, check each device is live and the venue is signed up.</li><li>Be the venue's named contact for any issue.</li><li>Raise a ticket when a device goes quiet or is moved.</li><li>Report non-compliance to MCSN with the evidence.</li></ul>
+      <div class="ladder">
+        <div><b>Agent</b><span>Own a zone of 10+ venues. Training and a branded kit.</span></div>
+        <div><b>Zone lead</b><span>Support 5 to 10 agents. Handle escalations.</span></div>
+        <div><b>District supervisor</b><span>Report to PlayTrace and MCSN on a district.</span></div>
+      </div>
+    </div>
+    <p class="sm" style="margin-top:20px">Escalation runs: reminder from the agent, formal notice from MCSN, referral to the NCC. Only the authorities can act on a breach.</p>
+  </div>
+</section>
+
+<!-- ARTISTS -->
+<section class="view" id="v-artists" hidden>
+  <div class="head"><p class="eyebrow">For artists, managers, labels and publishers</p><h1 style="font-size:clamp(2.2rem,5.5vw,4rem)">If it plays in a room, it should pay you.</h1><p class="lede">Register your music once. PlayTrace listens in participating venues and reports every match to MCSN. A hit from ten years ago counts exactly like a hit from this week.</p></div>
+  <div class="cols2">
+    <div class="panel" style="display:grid;gap:14px">
+      <h3>Register a track</h3>
+      <form id="trackForm">
+        <label>Track title<input id="tTitle" required></label>
+        <div class="fgrid">
+          <label>Artist<input id="tArtist" required></label>
+          <label>Year released<input id="tYear" type="number" min="1950" max="2026" value="2015"></label>
+        </div>
+        <label>Your MCSN member number (optional)<input id="tMcsn" placeholder="Leave blank if not yet a member"></label>
+        <button class="btn accent" type="submit">Add to my library</button>
+        <p class="status" id="tStatus" role="status"></p>
+      </form>
+    </div>
+    <div style="display:grid;gap:14px;align-content:start">
+      <h3>My registered works</h3>
+      <div class="tbl"><table><thead><tr><th>Track</th><th>Artist</th><th>Year</th><th>Status</th></tr></thead><tbody id="tBody"></tbody></table></div>
+      <p class="sm">Sample rows with invented names. Entries you add stay in this page only.</p>
+    </div>
+  </div>
+  <div class="band" style="margin-top:48px">
+    <div class="cols3">
+      <div><h3>Free for artists</h3><p class="sm">Registering and getting matched costs nothing.</p></div>
+      <div><h3>Paid plans for labels and publishers</h3><p class="sm">Extra analytics: trends by city, venue type and time of day. Always aggregated.</p></div>
+      <div><h3>Unclaimed money is held</h3><p class="sm">If a match has no registered owner, it is held and reported, not quietly shared out.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PARTNERS -->
+<section class="view" id="v-partners" hidden>
+  <div class="head"><p class="eyebrow">MCSN, NCC and government</p><h1 style="font-size:clamp(2.2rem,5.5vw,4rem)">A pilot that pays for itself and shows its work.</h1><p class="lede">We ask for a 6-month Lagos pilot with MCSN and the Nigerian Copyright Commission. We do not replace MCSN or collect licence fees. We supply devices, a field network and data, and are paid a service fee.</p></div>
+
+  <div class="cols3">
+    <div class="panel"><p class="mono">MCSN GETS</p><h3 style="margin-top:8px">More collections, better data</h3><p class="sm" style="margin-top:8px">New licensed venues, monthly payments, and play data that backs every distribution.</p></div>
+    <div class="panel"><p class="mono">NCC GETS</p><h3 style="margin-top:8px">Compliance it can see</h3><p class="sm" style="margin-top:8px">A record per venue and clear escalation, instead of searching for unlicensed ones.</p></div>
+    <div class="panel"><p class="mono">GOVERNMENT GETS</p><h3 style="margin-top:8px">Tax and formal youth jobs</h3><p class="sm" style="margin-top:8px">VAT and income tax, plus a zone-agent network that needs no factory.</p></div>
+  </div>
+
+  <div class="band" style="margin-top:48px">
+    <div class="cols2">
+      <div style="display:grid;gap:14px">
+        <h2>Where a $40 monthly bill goes</h2>
+        <p class="lede">Assumptions from the plan: licence fee $28, service fee $12, MCSN administration 15%. VAT on the service fee, about $0.90, is paid on top to government.</p>
+      </div>
+      <div>
+        <div class="stackbar" role="img" aria-label="Split of a 40 dollar bill: rights holders 23.80, MCSN administration 4.20, PlayTrace costs 8.44, PlayTrace margin 3.56">
+          <div style="width:59.5%;background:#0A7F8B">23.80</div>
+          <div style="width:10.5%;background:#4A5560">4.20</div>
+          <div style="width:21.1%;background:#6B4FC9">8.44</div>
+          <div style="width:8.9%;background:#B26A00"></div>
+        </div>
+        <div class="legend">
+          <span><i style="background:#0A7F8B"></i>Rights holders $23.80</span>
+          <span><i style="background:#4A5560"></i>MCSN admin $4.20</span>
+          <span><i style="background:#6B4FC9"></i>Cost to serve $8.44</span>
+          <span><i style="background:#B26A00"></i>PlayTrace margin $3.56</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="band">
+    <div class="head" style="margin-bottom:20px"><h2>The pilot, and how we will be judged</h2><p class="lede">Lagos, 100 venues, 10 agents, 6 months. Targets agreed with MCSN before we start.</p></div>
+    <div class="tbl"><table><thead><tr><th>Gate</th><th>Target</th></tr></thead><tbody>
+      <tr><td>Plays matched to a registered work</td><td>85% or better in quiet and mid-noise venues. Clubs reported separately.</td></tr>
+      <tr><td>Devices live</td><td>95% uptime</td></tr>
+      <tr><td>Unlicensed venues newly licensed</td><td>At least 60% of those enrolled</td></tr>
+      <tr><td>Venues willing to continue</td><td>80%</td></tr>
+      <tr><td>Agent retention after 6 months</td><td>80%</td></tr>
+      <tr><td>Privacy complaints upheld</td><td>Zero</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="band">
+    <div class="cols2">
+      <div style="display:grid;gap:12px">
+        <h2>What we are asking for</h2>
+        <ul class="list"><li>A written pilot agreement with MCSN on service fee, data use and who bills.</li><li>NCC guidance that device data can support distributions.</li><li>A named contact at each, and a start date.</li></ul>
+      </div>
+      <div style="display:grid;gap:12px">
+        <h2>What we are not asking for</h2>
+        <ul class="list"><li>No public money for devices in the pilot.</li><li>No power to enforce. Agents report; MCSN and the NCC act.</li><li>No change to MCSN's tariffs.</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">
+  <div style="display:grid;gap:8px"><a class="brand" href="#home"><svg viewBox="0 0 32 32" aria-hidden="true" width="28" height="28"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="21" cy="23" r="3" fill="var(--accent)"/></svg>PlayTrace</a><p class="sm" style="max-width:46ch">Music measurement for the places music is played. This site is a working prototype; figures and names are examples, and no form on it sends data.</p></div>
+  <div style="display:grid;gap:8px">
+    <p class="mono">CONTACT · ADEBISI LAWAL</p>
+    <p>Email <span id="em">adebisi@vuga.org</span><button class="copy" type="button" data-c="adebisi@vuga.org">Copy</button></p>
+    <p>Phone <span id="ph">+1 437 660 4623</span><button class="copy" type="button" data-c="+1 437 660 4623">Copy</button></p>
+  </div>
+</div></footer>
+
+<script>
+(function(){
+  var routes=['home','venues','agents','artists','partners'];
+  var homeBands=['v-home','b-who','b-how','b-product','b-privacy','b-bill'];
+  function route(){
+    var h=(location.hash||'#home').slice(1); if(routes.indexOf(h)<0)h='home';
+    homeBands.forEach(function(id){var e=document.getElementById(id); if(e)e.hidden=(h!=='home');});
+    ['venues','agents','artists','partners'].forEach(function(r){document.getElementById('v-'+r).hidden=(h!==r);});
+    document.querySelectorAll('nav a').forEach(function(a){ if(a.dataset.r===h)a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');});
+    window.scrollTo(0,0);
+  }
+  window.addEventListener('hashchange',route); route();
+
+  /* live demo log (invented tracks) */
+  var tracks=[["Lagos After Rain","Adaeze Obi"],["Midnight Danfo","Tunde Bello"],["Palm Wine Sunday","Kemi & The Delta"],["Slow Burn Highlife","Chike Eze"],["Third Mainland","Ife Adeyemi"],["Sugar in the Harmattan","Ngozi Aka"],["Roundabout","Femi Oyin"],["Old Town Radio","Bayo Salami"]];
+  var skip=["Unregistered track","Unregistered track"];
+  var list=document.getElementById('logList'), cnt=document.getElementById('logCount'), n=0, items=[];
+  function now(d){return d.toTimeString().slice(0,5);}
+  function add(){
+    var isSkip=Math.random()<.15, t=isSkip?null:tracks[Math.floor(Math.random()*tracks.length)];
+    items.unshift({time:now(new Date()),title:isSkip?'Not in library':t[0],by:isSkip?'ignored':t[1],skip:isSkip});
+    if(!isSkip)n+=1; items=items.slice(0,5); draw();
+  }
+  function draw(){
+    list.innerHTML=''; cnt.textContent=(1284+n)+' matched this month';
+    items.forEach(function(it){
+      var li=document.createElement('li');
+      var a=document.createElement('span');a.className='mono t';a.textContent=it.time;
+      var b=document.createElement('b');b.textContent=it.title+' · '+it.by;
+      var c=document.createElement('span');c.className='tag'+(it.skip?' skip':'');c.textContent=it.skip?'IGNORED':'MATCHED';
+      li.appendChild(a);li.appendChild(b);li.appendChild(c);list.appendChild(li);
+    });
+  }
+  for(var i=0;i<4;i++){var t=tracks[i];items.push({time:'20:'+(30+i*3),title:t[0],by:t[1],skip:false});}
+  items.reverse(); items.reverse(); draw();
+  setInterval(add,3200);
+
+  /* finish picker */
+  var finishes={white:["img/prod_white.png","White finish. All three colours come from the plastic itself, so every venue gets the same tested hardware."],grey:["img/prod_grey.png","Grey finish. Sits quietly against concrete, wood and darker walls."],black:["img/prod_black.png","Black finish. Disappears into dark ceilings and lounge interiors."],inside:["img/prod_black_ex.png","Exploded view: the disc, the magnetic plate with its hidden lock, and the board with SIM and GPS inside."]};
+  document.querySelectorAll('.seg button').forEach(function(b){
+    b.addEventListener('click',function(){
+      var f=b.dataset.f; document.getElementById('prodImg').src=finishes[f][0]; document.getElementById('finishNote').textContent=finishes[f][1];
+      document.querySelectorAll('.seg button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false');});
+    });
+  });
+
+  /* bill calculator */
+  var SERVICE=12;
+  function calc(){
+    var base=+document.getElementById('cType').value, size=+document.getElementById('cSize').value, rooms=+document.getElementById('cRooms').value;
+    document.getElementById('cRoomsV').textContent=rooms;
+    var lic=Math.round(base*size*(1+(rooms-1)*0.4)*100)/100, svc=SERVICE*rooms, tot=lic+svc;
+    document.getElementById('cTotal').textContent='$'+tot.toFixed(2).replace(/\.00$/,'');
+    document.getElementById('cSplit').textContent='MCSN licence fee $'+lic.toFixed(2)+' + PlayTrace service '+rooms+' device'+(rooms>1?'s':'')+' $'+svc.toFixed(2)+', before VAT on the service fee.';
+  }
+  ['cType','cSize','cRooms'].forEach(function(id){document.getElementById(id).addEventListener('input',calc);}); calc();
+
+  /* agent earnings */
+  function earn(){
+    var v=+document.getElementById('aV').value, nn=+document.getElementById('aN').value;
+    document.getElementById('aVV').textContent=v; document.getElementById('aNV').textContent=Math.min(nn,v);
+    var bonus=Math.min(nn,v)*28*0.05*1; /* 5% of an assumed $28 licence fee per newly signed venue, monthly */
+    var total=v*3+bonus;
+    document.getElementById('aTotal').textContent='$'+Math.round(total);
+    document.getElementById('aNote').textContent=v*3+' from active venues'+(bonus?' plus about '+Math.round(bonus)+' from newly licensed venues':'')+'. '+(v<20?'Part-time level.':v<40?'Between part-time and full-time.':'Full-time level.');
+  }
+  ['aV','aN'].forEach(function(id){document.getElementById(id).addEventListener('input',earn);}); earn();
+
+  /* forms (prototype only) */
+  function done(formId,statusId,msg){document.getElementById(formId).addEventListener('submit',function(e){e.preventDefault();document.getElementById(statusId).textContent=msg;});}
+  done('venueForm','vStatus','Request noted in this prototype only. Nothing was sent.');
+  done('agentForm','agStatus','Application noted in this prototype only. Nothing was sent.');
+
+  /* artist library */
+  var rows=[["Lagos After Rain","Adaeze Obi","2014","Linked to MCSN"],["Palm Wine Sunday","Kemi & The Delta","2009","Linked to MCSN"],["Old Town Radio","Bayo Salami","1998","Claim pending"]];
+  var tb=document.getElementById('tBody');
+  function addRow(r){var tr=document.createElement('tr');r.forEach(function(c){var td=document.createElement('td');td.textContent=c;tr.appendChild(td);});tb.appendChild(tr);}
+  rows.forEach(addRow);
+  document.getElementById('trackForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    var t=document.getElementById('tTitle'),a=document.getElementById('tArtist'),y=document.getElementById('tYear'),m=document.getElementById('tMcsn');
+    addRow([t.value,a.value,y.value,m.value?'Linked to MCSN':'Claim pending']);
+    document.getElementById('tStatus').textContent='Added. It stays in this page only.';
+    t.value='';a.value='';
+  });
+
+  /* copy buttons */
+  document.querySelectorAll('.copy').forEach(function(b){
+    b.addEventListener('click',function(){
+      var t=b.dataset.c, el=b.previousElementSibling;
+      function sel(){var r=document.createRange();r.selectNodeContents(el);var s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Selected';}
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){b.textContent='Copied';},sel);}else sel();
+    });
+  });
+})();
+</script>
+</body>
+</html>
