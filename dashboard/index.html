@@ -112,6 +112,8 @@ svg text{fill:var(--muted);font:11px var(--mono)}
     <a href="#overview" data-v="overview">Overview</a>
     <a href="#fleet" data-v="fleet">Devices</a>
     <a href="#zones" data-v="zones">Zones and agents</a>
+    <small>Industry</small>
+    <a href="#charts" data-v="charts">Charts</a>
     <small>Money</small>
     <a href="#royalties" data-v="royalties">Royalties</a>
     <small>Portals</small>
@@ -176,6 +178,23 @@ function econ(){
 }
 const clock0=new Date(2026,9,31,14,4,0);
 
+/* ---------- chart data (simulated) ---------- */
+const tracks=[];
+artists.forEach(a=>a.tracks.forEach((t,j)=>{const aff={};zones.forEach(z=>aff[z.id]=0.2+R()*1.9);
+  tracks.push({id:tracks.length,title:t,artist:a.name,genre:a.genre,w:a.w/(1+j*0.6),aff,prev:0.8+R()*0.45,wk:1+Math.floor(R()*14)})}));
+const REG={all:{name:"All Nigeria",z:zones.map(z=>z.id)},lagos:{name:"Lagos (all zones)",z:zones.filter(z=>z.city==="Lagos").map(z=>z.id)},abuja:{name:"Abuja",z:zones.filter(z=>z.city==="Abuja").map(z=>z.id)}};
+zones.forEach(z=>REG[z.id]={name:z.name,z:[z.id]});
+const zoneVol=id=>byZone(id).filter(v=>v.active&&v.status!=="offline").reduce((x,v)=>x+v.perDay,0);
+function chartFor(reg,days,genre){
+  const zs=REG[reg].z, vol=zs.reduce((s,id)=>s+zoneVol(id),0)*days*(1-UNMATCHED);
+  const sc=(t,k)=>zs.reduce((s,id)=>s+t.w*t.aff[id]*zoneVol(id),0)*k;
+  const totN=tracks.reduce((s,t)=>s+sc(t,1),0), totP=tracks.reduce((s,t)=>s+sc(t,t.prev),0);
+  let rows=tracks.filter(t=>genre==="all"||t.genre===genre).map(t=>({t,plays:vol*sc(t,1)/totN,prevPlays:vol*sc(t,t.prev)/totP}));
+  const rk=key=>[...rows].sort((a,b)=>b[key]-a[key]).map(r=>r.t.id);
+  const now=rk("plays"),prev=rk("prevPlays");
+  rows.forEach(r=>{r.rank=now.indexOf(r.t.id)+1;r.prevRank=prev.indexOf(r.t.id)+1;r.move=r.prevRank-r.rank;r.share=r.plays/vol;r.isNew=r.t.wk===1;r.peak=Math.min(r.rank,r.prevRank)});
+  return rows.sort((a,b)=>a.rank-b.rank);
+}
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
 const pill=s=>`<span class="pill p-${s}">${{online:"Online",weak:"Weak signal",offline:"Offline",tamper:"Tamper alert",pending:"Not installed"}[s]}</span>`;
@@ -271,6 +290,45 @@ V.zones=()=>{
    </tbody></table></div><p class="note">Payout = ${naira(A.agentPay)} per active venue + 5% of a licence tier for each venue added in the last 30 days (placeholder rule).</p></div>`;
 };
 
+let cReg="all",cDays=7,cGen="all";
+V.charts=()=>head("Charts","Songs ranked by verified plays in real venues. Built for awards organisers, radio, press and chart publishers.")+
+ `<div class="toolbar">
+   <label for="cr">Region<select id="cr">${Object.keys(REG).map(k=>`<option value="${k}">${REG[k].name}</option>`).join("")}</select></label>
+   <label for="cg">Genre<select id="cg"><option value="all">All genres</option>${[...new Set(artists.map(a=>a.genre))].map(g=>`<option>${g}</option>`).join("")}</select></label>
+   <div><div class="note" style="margin-bottom:3px">Period</div><div class="seg" role="group" aria-label="Period"><button id="c7" aria-pressed="true">7 days</button><button id="c30" aria-pressed="false">30 days</button></div></div>
+   <button id="ccopy" style="margin-left:auto">Copy chart as CSV</button><span class="note" id="cmsg"></span>
+  </div>
+  <div class="grid two"><div class="card"><h2 id="ctitle"></h2><div class="scroll"><table><thead><tr><th class="n">#</th><th>Move</th><th>Song</th><th>Artist</th><th>Genre</th><th class="n">Verified plays</th><th>Share</th><th class="n">Weeks</th><th class="n">Peak</th></tr></thead><tbody id="cbody"></tbody></table></div></div>
+  <div style="display:grid;gap:14px;align-content:start">
+   <div class="card"><h2>Number one by region</h2><div id="cleaders"></div></div>
+   <div class="card"><h2>Biggest climbers</h2><div id="crisers"></div></div>
+  </div></div>
+  <div class="card" style="margin-top:14px"><h2>Chart rules</h2><div class="grid three">
+   <div><b>Verified plays only</b><p class="note">A play counts when 30 seconds or more of a registered track is matched in a live venue.</p></div>
+   <div><b>Clean devices only</b><p class="note">Offline devices and devices with an open tamper alert are left out until an agent clears them.</p></div>
+   <div><b>One venue cannot swing a chart</b><p class="note">Each venue counts at most 20 plays of one song per day. Event venues are not in the network.</p></div>
+  </div><p class="note">Chart data is a licensed feed for awards bodies and chart publishers. The figures here are simulated.</p></div>`;
+function chartsInit(){
+  const draw=()=>{
+    const rows=chartFor(cReg,cDays,cGen);
+    $("#ctitle").textContent=`${REG[cReg].name}, last ${cDays} days${cGen==="all"?"":", "+cGen}`;
+    const top=rows[0]?.plays||1;
+    $("#cbody").innerHTML=rows.slice(0,15).map(r=>{
+      const m=r.isNew&&cDays===7?'<span class="pill p-pending">New</span>':r.move>0?`<span class="up">▲ ${r.move}</span>`:r.move<0?`<span class="dn">▼ ${-r.move}</span>`:'<span class="note">–</span>';
+      return `<tr><td class="n"><b>${r.rank}</b></td><td>${m}</td><td>${r.t.title}</td><td>${r.t.artist}</td><td>${r.t.genre}</td><td class="n">${num(r.plays)}</td><td style="min-width:90px"><div class="bar"><b style="width:${r.plays/top*100}%"></b></div></td><td class="n">${r.t.wk}</td><td class="n">${Math.min(r.peak,r.rank)}</td></tr>`}).join("");
+    $("#cleaders").innerHTML=zones.map(z=>{const w=chartFor(z.id,cDays,cGen)[0];return `<div class="top" style="margin:0;padding:5px 0;border-bottom:1px solid var(--line)"><span>${z.name}</span><span style="text-align:right"><b>${w.t.title}</b><br><span class="note">${w.t.artist}</span></span></div>`}).join("");
+    const ris=[...rows].filter(r=>r.move>0).sort((a,b)=>b.move-a.move).slice(0,4);
+    $("#crisers").innerHTML=ris.length?ris.map(r=>`<div class="top" style="margin:0;padding:5px 0;border-bottom:1px solid var(--line)"><span>${r.t.title}<br><span class="note">${r.t.artist}</span></span><span class="up">▲ ${r.move}</span></div>`).join(""):'<p class="note">No climbers for this selection.</p>';
+    window._csv=["rank,song,artist,genre,region,period_days,verified_plays"].concat(rows.map(r=>[r.rank,r.t.title,r.t.artist,r.t.genre,REG[cReg].name,cDays,Math.round(r.plays)].map(x=>`"${x}"`).join(","))).join("\n");
+  };
+  $("#cr").value=cReg;$("#cg").value=cGen;
+  $("#cr").onchange=()=>{cReg=$("#cr").value;draw()};$("#cg").onchange=()=>{cGen=$("#cg").value;draw()};
+  [[7,"c7"],[30,"c30"]].forEach(([d,id])=>$("#"+id).onclick=()=>{cDays=d;$("#c7").setAttribute("aria-pressed",d===7);$("#c30").setAttribute("aria-pressed",d===30);draw()});
+  $("#c7").setAttribute("aria-pressed",cDays===7);$("#c30").setAttribute("aria-pressed",cDays===30);
+  $("#ccopy").onclick=async()=>{try{await navigator.clipboard.writeText(window._csv);$("#cmsg").textContent="Copied."}catch(e){$("#cmsg").textContent="Copy was blocked here. Select the table instead."}};
+  draw();
+}
+
 V.royalties=()=>{
   return head("Royalties","Placeholder logic for the collecting society's view. Change the assumptions and every figure below recalculates.")+
   `<div class="grid two">
@@ -343,7 +401,7 @@ function venueInit(){
 
 V.platform=()=>head("Platform and status","What is built, what is a placeholder, and the order we build the rest.")+
  `<div class="grid three">
-  <div class="card"><h2>Built in this preview</h2><ul><li>Operations overview and live feed (simulated)</li><li>Device list with tamper detail</li><li>Zone and agent payouts</li><li>Royalty allocation with editable assumptions</li><li>Artist and venue portal views</li></ul></div>
+  <div class="card"><h2>Built in this preview</h2><ul><li>Operations overview and live feed (simulated)</li><li>Device list with tamper detail</li><li>Zone and agent payouts</li><li>Regional song charts for awards bodies and publishers</li><li>Royalty allocation with editable assumptions</li><li>Artist and venue portal views</li></ul></div>
   <div class="card"><h2>Placeholder only</h2><ul><li>All data is generated, none is measured</li><li>Licence tiers and splits are not society tariffs</li><li>No payments, logins or real devices</li><li>Recognition accuracy is not yet proven</li></ul></div>
   <div class="card"><h2>Next builds</h2><ol><li>Device registry and secure enrolment</li><li>Ingest API, mutual TLS, signed OTA</li><li>Fingerprint matching service and library upload</li><li>Play ledger and monthly statements</li><li>Role logins, agent app, venue billing</li></ol></div>
  </div>
@@ -381,7 +439,7 @@ function show(){
   $("#main").innerHTML=V[k]();
   document.querySelectorAll(".rail a").forEach(a=>a.toggleAttribute("aria-current",a.dataset.v===k)||0);
   document.querySelectorAll(".rail a").forEach(a=>{if(a.dataset.v===k)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
-  if(k==="overview")feedStart();if(k==="fleet")fleetInit();if(k==="royalties")royInit();if(k==="artist")artistInit();if(k==="venue")venueInit();
+  if(k==="overview")feedStart();if(k==="fleet")fleetInit();if(k==="royalties")royInit();if(k==="charts")chartsInit();if(k==="artist")artistInit();if(k==="venue")venueInit();
   window.scrollTo(0,0);
 }
 addEventListener("hashchange",show);show();
