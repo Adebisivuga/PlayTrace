@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlayTrace Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: fixed left rail of role views, one scannable workspace on the right, summary tiles first, detail below. */
+:root{
+  --bg:#f3f6f9; --panel:#ffffff; --ink:#142033; --muted:#5d6b80; --line:#dde4ec;
+  --accent:#0794ad; --accent-ink:#ffffff; --accent-soft:#dff3f7;
+  --good:#1f8f4e; --good-soft:#e2f4e9; --warn:#b26a00; --warn-soft:#fdf0d8; --bad:#c23a2e; --bad-soft:#fbe6e3;
+  --rail:#142033; --rail-ink:#c9d3e2;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1420; --panel:#151f30; --ink:#e7edf6; --muted:#93a1b8; --line:#26334a;
+  --accent:#2cc3dc; --accent-ink:#06222a; --accent-soft:#12323c;
+  --good:#4cc782; --good-soft:#12301f; --warn:#e8a63a; --warn-soft:#352a12; --bad:#ef7b6e; --bad-soft:#3a1c19;
+  --rail:#09101a; --rail-ink:#a7b4c9; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0d1420; --panel:#151f30; --ink:#e7edf6; --muted:#93a1b8; --line:#26334a;
+  --accent:#2cc3dc; --accent-ink:#06222a; --accent-soft:#12323c;
+  --good:#4cc782; --good-soft:#12301f; --warn:#e8a63a; --warn-soft:#352a12; --bad:#ef7b6e; --bad-soft:#3a1c19;
+  --rail:#09101a; --rail-ink:#a7b4c9; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.rail{background:var(--rail);color:var(--rail-ink);padding:20px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:0 10px 18px;color:#fff;font-weight:600;font-size:16px;letter-spacing:.2px}
+.brand i{width:22px;height:22px;border-radius:50%;border:2px solid #2cc3dc;display:inline-block;position:relative}
+.brand i:after{content:"";position:absolute;inset:5px;border-radius:50%;background:#2cc3dc}
+.rail small{padding:10px 10px 2px;font-size:11px;letter-spacing:.8px;text-transform:uppercase;opacity:.6}
+.rail a{display:block;padding:8px 10px;border-radius:6px;color:inherit;text-decoration:none;cursor:pointer}
+.rail a:hover{background:rgba(255,255,255,.07)}
+.rail a[aria-current="page"]{background:rgba(44,195,220,.16);color:#fff;box-shadow:inset 3px 0 0 #2cc3dc}
+.rail a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,tr[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rail .foot{margin-top:auto;padding:10px;font-size:12px;opacity:.7}
+main{padding:22px 28px 60px;min-width:0}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:6px}
+h1{font-size:22px;margin:0;font-weight:600}
+.sub{color:var(--muted);margin:2px 0 16px}
+.demo{display:inline-flex;gap:8px;align-items:center;background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn);border-radius:999px;padding:3px 12px;font-size:12px;font-weight:500}
+.grid{display:grid;gap:14px}
+.tiles{grid-template-columns:repeat(auto-fit,minmax(148px,1fr));margin-bottom:14px}
+.two{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}
+.three{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.card h2{font-size:13px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:600}
+.tile .v{font:500 23px/1.15 var(--mono);font-variant-numeric:tabular-nums;margin-top:2px}
+.tile .l{color:var(--muted);font-size:12px}
+.tile .d{font-size:12px;margin-top:4px}
+.up{color:var(--good)} .dn{color:var(--bad)}
+.pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+.p-online{background:var(--good-soft);color:var(--good)} .p-weak{background:var(--warn-soft);color:var(--warn)}
+.p-offline{background:var(--line);color:var(--muted)} .p-tamper{background:var(--bad-soft);color:var(--bad)} .p-pending{background:var(--accent-soft);color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{text-align:left;font-size:12px;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td.n,th.n{text-align:right}
+tbody tr[tabindex]{cursor:pointer} tbody tr[tabindex]:hover{background:var(--accent-soft)}
+tr.sel{background:var(--accent-soft)}
+.scroll{overflow-x:auto}
+.mono{font-family:var(--mono)}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar b{display:block;height:100%;background:var(--accent)}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:center}
+select,input[type=number],input[type=text]{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font:inherit}
+input[type=range]{accent-color:var(--accent)}
+label{color:var(--muted);font-size:12px;display:flex;flex-direction:column;gap:3px}
+button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer}
+button.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:500}
+.feed{list-style:none;margin:0;padding:0;max-height:330px;overflow:auto}
+.feed li{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.feed .t{font-family:var(--mono);color:var(--muted);font-size:12px;min-width:58px}
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;counter-reset:s}
+.flow div{border:1px solid var(--line);border-radius:8px;padding:10px 12px;position:relative;background:var(--bg)}
+.flow div:before{counter-increment:s;content:counter(s);font:500 12px var(--mono);color:var(--accent);display:block;margin-bottom:2px}
+.flow b{display:block;font-weight:600}
+.flow span{color:var(--muted);font-size:12px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-family:var(--mono)}
+.note{color:var(--muted);font-size:12px}
+.seg{display:flex;gap:3px;background:var(--bg);padding:3px;border-radius:8px;border:1px solid var(--line)}
+.seg button{border:0;background:transparent;padding:4px 10px}
+.seg button[aria-pressed="true"]{background:var(--panel);box-shadow:0 0 0 1px var(--line);font-weight:500}
+.stack{display:flex;height:26px;border-radius:6px;overflow:hidden;margin:8px 0}
+.stack span{display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-family:var(--mono);overflow:hidden}
+svg text{fill:var(--muted);font:11px var(--mono)}
+.status{display:flex;gap:6px;flex-wrap:wrap}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;padding:10px 12px;align-items:center}
+  .rail small,.rail .foot{display:none}
+  .brand{padding:0 10px 0 0}
+  .rail a{padding:6px 10px}
+  main{padding:16px}
+  .two{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:no-preference){.card{transition:box-shadow .15s}.card:hover{box-shadow:0 2px 10px rgba(20,32,51,.07)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Views">
+    <div class="brand"><i></i>PlayTrace</div>
+    <small>Operations</small>
+    <a href="#overview" data-v="overview">Overview</a>
+    <a href="#fleet" data-v="fleet">Devices</a>
+    <a href="#zones" data-v="zones">Zones and agents</a>
+    <small>Money</small>
+    <a href="#royalties" data-v="royalties">Royalties</a>
+    <small>Portals</small>
+    <a href="#artist" data-v="artist">Artist portal</a>
+    <a href="#venue" data-v="venue">Venue portal</a>
+    <small>About</small>
+    <a href="#platform" data-v="platform">Platform and status</a>
+    <div class="foot">Placeholder build.<br>Simulated data only.</div>
+  </nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+
+<script>
+"use strict";
+/* ---------- seeded data (simulated) ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=mulberry32(2610);
+const pick=a=>a[Math.floor(R()*a.length)];
+const naira=n=>"₦"+Math.round(n).toLocaleString("en-US");
+const num=n=>Math.round(n).toLocaleString("en-US");
+
+const A={ service:16500, admin:12, agentPay:4000, tiers:{Salon:25000,Shop:25000,Cafe:38000,Restaurant:48000,Bar:83000,Gym:83000,Lounge:110000,Hotel:110000} };
+
+const zones=[
+ {id:"yaba",name:"Yaba",city:"Lagos",agent:"Tomi A."},{id:"surulere",name:"Surulere",city:"Lagos",agent:"Chidi O."},
+ {id:"lekki",name:"Lekki Phase 1",city:"Lagos",agent:"Zainab B."},{id:"ikeja",name:"Ikeja GRA",city:"Lagos",agent:"Femi K."},
+ {id:"vi",name:"Victoria Island",city:"Lagos",agent:"Ngozi E."},{id:"wuse",name:"Wuse 2",city:"Abuja",agent:"Hauwa M."}];
+const types=["Cafe","Bar","Restaurant","Salon","Gym","Shop","Lounge","Hotel"];
+const pre=["Mama Put","Blue Palm","Kuku Corner","Terrace 9","Ankara","Sunset","Bean Haus","Jollof","Palmwine","Ebony","Island","Harmattan","Lagoon","Suya Spot","Fresh Cut","Iron Works"];
+const tamperKinds=["Lid opened","Moved more than 5 m","Microphones covered","Mains cut","SIM removed"];
+const venues=[];
+let vi=0;
+zones.forEach(z=>{for(let k=0;k<10;k++){
+  const type=pick(types),roll=R();
+  const status=roll<.76?"online":roll<.87?"weak":roll<.93?"offline":roll<.965?"tamper":"pending";
+  const v={id:"PT-"+(z.city==="Lagos"?"LG":"AB")+"-"+String(++vi).padStart(4,"0"),name:pre[(vi*5)%pre.length]+" "+type,zone:z.id,type,status,
+    seen:status==="offline"?Math.round(60+R()*900):Math.round(R()*4),signal:status==="weak"?1+Math.floor(R()*2):3+Math.floor(R()*2),
+    match:+(0.78+R()*0.18).toFixed(3),perDay:Math.round(90+R()*190),
+    tamper:status==="tamper"?{kind:pick(tamperKinds),min:Math.round(8+R()*200)}:null,
+    installed:Math.round(20+R()*110)};
+  if(status==="pending"){v.seen=null;v.perDay=0;v.match=0;v.signal=0;v.installed=0}
+  v.active=status!=="pending";
+  venues.push(v);}});
+const byZone=id=>venues.filter(v=>v.zone===id);
+const active=venues.filter(v=>v.active);
+
+const artists=[["Ayo Bello","Afro-pop"],["Kemi and the Ferry","Highlife"],["Daba Okon","Afrobeats"],["Nneka Rue","R&B"],["Tunde Salako","Fuji fusion"],["Lola Marq","Alté"],["Chuks Ibe","Gospel"],["Sade Winter","Soul"],["Bayo Ramos","Amapiano"],["Efe Dara","Hip-hop"],["Yinka Owusu","Reggae"],["Mide Karim","Afro-house"]]
+ .map((a,i)=>({id:i,name:a[0],genre:a[1],w:1/Math.pow(i+1,.85),tracks:[a[0].split(" ")[0]+" Tonight","Lagos Slow","Third Mainland","Pepper Soup Love","Rainy Season"].slice(0,3+(i%3))}));
+const wsum=artists.reduce((s,a)=>s+a.w,0); artists.forEach(a=>a.share=a.w/wsum);
+const UNMATCHED=0.11;
+
+/* ---------- derived logic ---------- */
+const DAYS=30, seas=[.9,.85,.9,1,1.12,1.3,1.18];
+const fleetPerDay=active.reduce((s,v)=>s+(v.status==="offline"?0:v.perDay),0);
+const daily=[...Array(DAYS)].map((_,i)=>Math.round(fleetPerDay*(0.72+0.28*i/DAYS)*seas[i%7]*(0.97+R()*0.06)));
+const monthPlays=daily.reduce((a,b)=>a+b,0);
+function bill(v){return A.tiers[v.type]+A.service}
+function econ(){
+  const lic=active.reduce((s,v)=>s+A.tiers[v.type],0), svc=active.length*A.service;
+  const admin=lic*A.admin/100, pool=lic-admin, agents=active.length*A.agentPay;
+  return{lic,svc,admin,pool,agents,collected:lic+svc,matched:pool*(1-UNMATCHED),escrow:pool*UNMATCHED,ptNet:svc-agents};
+}
+const clock0=new Date(2026,9,31,14,4,0);
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const pill=s=>`<span class="pill p-${s}">${{online:"Online",weak:"Weak signal",offline:"Offline",tamper:"Tamper alert",pending:"Not installed"}[s]}</span>`;
+const zname=id=>zones.find(z=>z.id===id).name;
+function tile(l,v,d,cls){return `<div class="card tile"><div class="l">${l}</div><div class="v">${v}</div><div class="d ${cls||"note"}">${d||""}</div></div>`}
+function head(t,s){return `<div class="top"><h1>${t}</h1><span class="demo">Simulated data. Not live.</span></div><p class="sub">${s}</p>`}
+function barChart(vals,w,h,labFn,fmt){
+  const max=Math.max(...vals)*1.1,pl=44,pb=22,pt=8,bw=(w-pl)/vals.length;
+  let g="";for(let i=0;i<=4;i++){const y=pt+(h-pb-pt)*(1-i/4);g+=`<line x1="${pl}" x2="${w}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-6}" y="${y+4}" text-anchor="end">${fmt(max*i/4)}</text>`}
+  vals.forEach((v,i)=>{const bh=(h-pb-pt)*v/max;const last=i===vals.length-1;
+    g+=`<rect x="${pl+i*bw+1.5}" y="${h-pb-bh}" width="${Math.max(bw-3,2)}" height="${bh}" rx="2" fill="${last?"var(--accent)":"var(--accent-soft)"}" stroke="var(--accent)" stroke-width="${last?0:.6}"><title>${labFn(i)}: ${num(v)}</title></rect>`;
+    if(i%5===0||last)g+=`<text x="${last?w:pl+i*bw+bw/2}" y="${h-6}" text-anchor="${last?"end":"middle"}">${labFn(i)}</text>`});
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" role="img" aria-label="Verified plays per day, last 30 days">${g}</svg>`;
+}
+const dlab=i=>{const d=new Date(clock0);d.setDate(d.getDate()-(DAYS-1-i));return d.toLocaleDateString("en-GB",{day:"numeric",month:"short"})};
+
+/* ---------- views ---------- */
+const V={};
+let feedTimer=null, liveCount=0;
+
+V.overview=()=>{
+  const e=econ(),on=active.filter(v=>v.status==="online").length,al=venues.filter(v=>v.tamper).length;
+  const avgMatch=active.filter(v=>v.match).reduce((s,v)=>s+v.match,0)/active.filter(v=>v.match).length;
+  const todayPlays=Math.round(daily[DAYS-1]*0.6);
+  return head("Network overview","All zones, October 2026. Figures are generated from a fixed seed so every viewer sees the same numbers.")+
+  `<div class="grid tiles">
+    ${tile("Devices installed",num(active.length),`${venues.length-active.length} waiting for install`)}
+    ${tile("Online now",Math.round(on/active.length*100)+"%",`${on} of ${active.length} devices`,"up")}
+    ${tile("Verified plays today",`<span id="liveTotal">${num(todayPlays)}</span>`,"to 14:04, counts up live")}
+    ${tile("Match rate",(avgMatch*100).toFixed(1)+"%","Gate 1 target 85%",avgMatch>=.85?"up":"dn")}
+    ${tile("Billed this month",naira(e.collected),`${naira(e.pool)} rights-holder pool`)}
+    ${tile("Open tamper alerts",al,al?"Review in Devices":"None",al?"dn":"up")}
+   </div>
+   <div class="grid two">
+    <div class="card"><h2>Verified plays per day, last 30 days</h2>${barChart(daily,640,330,dlab,v=>v>=1000?(v/1000).toFixed(0)+"k":Math.round(v))}</div>
+    <div class="card"><h2>Live recognition feed</h2><ul class="feed" id="feed" aria-live="off"></ul></div>
+   </div>
+   <div class="grid" style="margin-top:14px"><div class="card"><h2>How a play becomes a payment</h2>
+    <div class="flow">
+     <div><b>Listen</b><span>Three microphones in the venue disc, music gate on the device.</span></div>
+     <div><b>Fingerprint</b><span>A short code is made on the device. No raw audio or speech is kept.</span></div>
+     <div><b>Match</b><span>The cloud checks the code against the registered library.</span></div>
+     <div><b>Ledger</b><span>Each verified play is written once with venue, zone, time and device.</span></div>
+     <div><b>Allocate</b><span>The society's pool is split by verified plays, unmatched share held.</span></div>
+     <div><b>Pay</b><span>Artist statements, agent payouts and venue bill follow the ledger.</span></div>
+    </div></div></div>`;
+};
+
+V.fleet=()=>{
+  return head("Devices","Every installed disc, with health and tamper state. Select a row for detail.")+
+  `<div class="toolbar">
+    <label for="fz">Zone<select id="fz"><option value="all">All zones</option>${zones.map(z=>`<option value="${z.id}">${z.name}</option>`).join("")}</select></label>
+    <label for="fs">Status<select id="fs"><option value="all">All</option><option value="online">Online</option><option value="weak">Weak signal</option><option value="offline">Offline</option><option value="tamper">Tamper alert</option><option value="pending">Not installed</option></select></label>
+    <label for="fq">Search<input id="fq" type="text" placeholder="Venue or device ID"></label>
+   </div>
+   <div class="grid two">
+    <div class="card"><div class="scroll"><table><thead><tr><th>Device</th><th>Venue</th><th>Zone</th><th>Status</th><th class="n">Last seen</th><th class="n">Match</th></tr></thead><tbody id="ft"></tbody></table></div></div>
+    <div class="card" id="fd"><h2>Device detail</h2><p class="note">Select a device in the table.</p></div>
+   </div>`;
+};
+function fleetInit(){
+  const draw=()=>{
+    const z=$("#fz").value,s=$("#fs").value,q=$("#fq").value.toLowerCase();
+    const rows=venues.filter(v=>(z==="all"||v.zone===z)&&(s==="all"||v.status===s)&&(v.name.toLowerCase().includes(q)||v.id.toLowerCase().includes(q)));
+    $("#ft").innerHTML=rows.map(v=>`<tr tabindex="0" data-id="${v.id}"><td class="mono">${v.id}</td><td>${v.name}</td><td>${zname(v.zone)}</td><td>${pill(v.status)}</td><td class="n">${v.seen===null?"-":v.seen<1?"now":v.seen<120?v.seen+" min":Math.round(v.seen/60)+" h"}</td><td class="n">${v.match?(v.match*100).toFixed(1)+"%":"-"}</td></tr>`).join("")||`<tr><td colspan="6" class="note">No devices match.</td></tr>`;
+    document.querySelectorAll("#ft tr[data-id]").forEach(r=>{const f=()=>{document.querySelectorAll("#ft tr").forEach(x=>x.classList.remove("sel"));r.classList.add("sel");detail(r.dataset.id)};r.onclick=f;r.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();f()}}});
+  };
+  ["fz","fs"].forEach(i=>$("#"+i).onchange=draw);$("#fq").oninput=draw;draw();
+  const first=venues.find(v=>v.tamper);if(first){const r=document.querySelector(`#ft tr[data-id="${first.id}"]`);if(r){r.classList.add("sel");detail(first.id)}}
+}
+function detail(id){
+  const v=venues.find(x=>x.id===id);
+  const checks=[["Hall sensor (lid)",v.tamper&&v.tamper.kind==="Lid opened"],["Accelerometer (moved)",v.tamper&&v.tamper.kind==="Moved more than 5 m"],["Microphones covered",v.tamper&&v.tamper.kind==="Microphones covered"],["Mains power",v.tamper&&v.tamper.kind==="Mains cut"],["SIM present",v.tamper&&v.tamper.kind==="SIM removed"]];
+  $("#fd").innerHTML=`<h2>Device detail</h2><div class="top" style="margin-bottom:8px"><b class="mono">${v.id}</b>${pill(v.status)}</div>
+   <dl class="kv"><dt>Venue</dt><dd>${v.name}</dd><dt>Zone</dt><dd>${zname(v.zone)}, agent ${zones.find(z=>z.id===v.zone).agent}</dd><dt>Type</dt><dd>${v.type}</dd>
+   <dt>Signal</dt><dd>${v.signal?"▮".repeat(v.signal)+"▯".repeat(4-v.signal):"-"}</dd><dt>Verified plays / day</dt><dd>${v.perDay?num(v.perDay):"-"}</dd>
+   <dt>Match rate</dt><dd>${v.match?(v.match*100).toFixed(1)+"%":"-"}</dd><dt>Days installed</dt><dd>${v.installed||"-"}</dd><dt>Monthly bill</dt><dd>${naira(bill(v))}</dd></dl>
+   <h2 style="margin-top:14px">Tamper sensors</h2>
+   ${v.active?checks.map(c=>`<div class="top" style="margin:0;padding:5px 0;border-bottom:1px solid var(--line)"><span>${c[0]}</span><span class="pill ${c[1]?"p-tamper":"p-online"}">${c[1]?"Triggered "+v.tamper.min+" min ago":"Normal"}</span></div>`).join(""):`<p class="note">No sensor data until installed.</p>`}
+   ${v.tamper?`<p class="note" style="margin-top:10px">Rule: the venue is not told. The alert goes to ${zones.find(z=>z.id===v.zone).agent} to visit and report. Agents report and escalate only.</p>`:""}`;
+}
+
+V.zones=()=>{
+  const rows=zones.map(z=>{const vs=byZone(z.id),act=vs.filter(v=>v.active),paid=act.length*A.agentPay,
+    newV=vs.filter(v=>v.installed&&v.installed<=30).length,bonus=newV*0.05*A.tiers.Restaurant,
+    plays=act.reduce((s,v)=>s+(v.status==="offline"?0:v.perDay*30),0);
+    return{z,vs,act,paid,bonus,plays,al:vs.filter(v=>v.tamper).length,health:act.filter(v=>v.status==="online").length/Math.max(act.length,1)}}).sort((a,b)=>b.plays-a.plays);
+  const tot=rows.reduce((s,r)=>s+r.paid+r.bonus,0);
+  return head("Zones and agents","Young music lovers who each look after 10 or more venues. They report and escalate; they cannot enforce.")+
+  `<div class="grid tiles">${tile("Zones",zones.length,"Lagos 5, Abuja 1")}${tile("Active venues",active.length,"10 or more per agent")}${tile("Agent payouts this month",naira(tot),`${naira(A.agentPay)} per active venue plus new-venue bonus`)}</div>
+   <div class="card"><h2>Agent leaderboard</h2><div class="scroll"><table><thead><tr><th>Zone</th><th>Agent</th><th class="n">Active venues</th><th>Health</th><th class="n">Alerts</th><th class="n">Plays / month</th><th class="n">Payout</th></tr></thead><tbody>
+   ${rows.map(r=>`<tr><td>${r.z.name}</td><td>${r.z.agent}</td><td class="n">${r.act.length}</td><td style="min-width:120px"><div class="bar"><b style="width:${Math.round(r.health*100)}%"></b></div></td><td class="n">${r.al}</td><td class="n">${num(r.plays)}</td><td class="n">${naira(r.paid+r.bonus)}</td></tr>`).join("")}
+   </tbody></table></div><p class="note">Payout = ${naira(A.agentPay)} per active venue + 5% of a licence tier for each venue added in the last 30 days (placeholder rule).</p></div>`;
+};
+
+V.royalties=()=>{
+  return head("Royalties","Placeholder logic for the collecting society's view. Change the assumptions and every figure below recalculates.")+
+  `<div class="grid two">
+   <div class="card"><h2>Assumptions</h2>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+     <label for="a_s">PlayTrace service fee / venue / month<input id="a_s" type="number" min="0" step="500" value="${A.service}"></label>
+     <label for="a_a">Society admin share (%)<input id="a_a" type="number" min="0" max="40" step="1" value="${A.admin}"></label>
+     <label for="a_g">Agent payout / active venue<input id="a_g" type="number" min="0" step="500" value="${A.agentPay}"></label>
+    </div>
+    <h2 style="margin-top:14px">Licence tiers (placeholder, set by the society)</h2>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))">${Object.keys(A.tiers).map(k=>`<label for="t_${k}">${k}<input id="t_${k}" data-t="${k}" type="number" min="0" step="1000" value="${A.tiers[k]}"></label>`).join("")}</div>
+    <p class="note">These numbers are not tariffs. The society sets real tariffs.</p></div>
+   <div class="card" id="roy"></div>
+  </div>
+  <div class="card" style="margin-top:14px"><h2>Artist allocation, October 2026</h2><div class="scroll" id="alloc"></div></div>`;
+};
+function royInit(){
+  const draw=()=>{
+    const e=econ();
+    $("#roy").innerHTML=`<h2>Where one month's billing goes</h2>
+     <div class="stack">${[["Rights holders",e.pool,"#0794ad"],["Society admin",e.admin,"#5b6f8f"],["PlayTrace service",e.svc,"#b26a00"]].map(s=>`<span style="width:${s[1]/e.collected*100}%;background:${s[2]}" title="${s[0]}">${Math.round(s[1]/e.collected*100)}%</span>`).join("")}</div>
+     <dl class="kv"><dt>Total billed</dt><dd>${naira(e.collected)}</dd><dt>Licence fees (society)</dt><dd>${naira(e.lic)}</dd><dt>Society admin</dt><dd>-${naira(e.admin)}</dd>
+     <dt>Rights-holder pool</dt><dd>${naira(e.pool)}</dd><dt>Held for unmatched plays (${Math.round(UNMATCHED*100)}%)</dt><dd>${naira(e.escrow)}</dd><dt>To registered artists</dt><dd>${naira(e.matched)}</dd>
+     <dt>PlayTrace service fees</dt><dd>${naira(e.svc)}</dd><dt>Agent payouts</dt><dd>-${naira(e.agents)}</dd><dt>Left for devices and network</dt><dd>${naira(e.ptNet)}</dd></dl>`;
+    const mp=monthPlays*(1-UNMATCHED);
+    $("#alloc").innerHTML=`<table><thead><tr><th>Artist</th><th>Genre</th><th class="n">Verified plays</th><th class="n">Share</th><th class="n">Allocation</th></tr></thead><tbody>${artists.map(a=>`<tr><td>${a.name}</td><td>${a.genre}</td><td class="n">${num(mp*a.share)}</td><td class="n">${(a.share*100).toFixed(1)}%</td><td class="n">${naira(e.matched*a.share)}</td></tr>`).join("")}
+     <tr><td><b>Unmatched, held</b></td><td class="note">Claim by registering the track</td><td class="n">${num(monthPlays*UNMATCHED)}</td><td class="n">${(UNMATCHED*100).toFixed(1)}%</td><td class="n">${naira(e.escrow)}</td></tr></tbody></table>
+     <p class="note">Allocation rule: rights-holder pool x share of verified plays. A play counts when at least 30 seconds of a registered track is matched. Unmatched plays are held until claimed.</p>`;
+  };
+  ["a_s","a_a","a_g"].forEach(id=>$("#"+id).oninput=()=>{A.service=+$("#a_s").value||0;A.admin=Math.min(40,+$("#a_a").value||0);A.agentPay=+$("#a_g").value||0;draw()});
+  document.querySelectorAll("[data-t]").forEach(i=>i.oninput=()=>{A.tiers[i.dataset.t]=+i.value||0;draw()});
+  draw();
+}
+
+let curArtist=0;
+V.artist=()=>{
+  return head("Artist portal","What an artist sees: where their music was heard and what it earned. Free for artists.")+
+  `<div class="toolbar"><label for="as">Artist<select id="as">${artists.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select></label></div><div id="ap"></div>`;
+};
+function artistInit(){
+  const draw=()=>{
+    const a=artists[curArtist],e=econ(),mp=monthPlays*(1-UNMATCHED)*a.share;
+    const tv=active.filter(v=>v.match).map(v=>({v,p:v.perDay*30*a.share*(0.8+((v.id.charCodeAt(6)*7+curArtist*13)%40)/100)})).sort((x,y)=>y.p-x.p).slice(0,6);
+    const zs=zones.map(z=>({z,p:byZone(z.id).filter(v=>v.active&&v.status!=="offline").reduce((s,v)=>s+v.perDay*30*a.share,0)}));const zm=Math.max(...zs.map(x=>x.p));
+    $("#ap").innerHTML=`<div class="grid tiles">${tile("Verified plays",num(mp),"this month")}${tile("Venues played in",num(active.length*0.7|0),"of "+active.length)}${tile("Allocation",naira(e.matched*a.share),"payable after society statement")}${tile("Share of pool",(a.share*100).toFixed(1)+"%")}</div>
+     <div class="grid two"><div class="card"><h2>Top venues</h2><table><thead><tr><th>Venue</th><th>Zone</th><th class="n">Plays</th></tr></thead><tbody>${tv.map(t=>`<tr><td>${t.v.name}</td><td>${zname(t.v.zone)}</td><td class="n">${num(t.p)}</td></tr>`).join("")}</tbody></table></div>
+     <div class="card"><h2>Plays by zone</h2>${zs.map(x=>`<div style="margin:8px 0"><div class="top" style="margin:0"><span>${x.z.name}</span><span class="mono">${num(x.p)}</span></div><div class="bar"><b style="width:${x.p/zm*100}%"></b></div></div>`).join("")}</div></div>
+     <div class="card" style="margin-top:14px"><h2>Registered tracks</h2>${a.tracks.map(t=>`<span class="pill p-pending" style="margin:2px 4px 2px 0">${t}</span>`).join("")}<p class="note">Upload a track once. The fingerprint is added to the library and plays are matched from then on.</p></div>`;
+  };
+  $("#as").value=curArtist;$("#as").onchange=()=>{curArtist=+$("#as").value;draw()};draw();
+}
+
+let curVenue=0;
+V.venue=()=>{
+  const vs=active;
+  return head("Venue portal","What a cafe, bar or salon owner sees: one monthly music bill, proof of licence and what played.")+
+  `<div class="toolbar"><label for="vs">Venue<select id="vs">${vs.map((v,i)=>`<option value="${i}">${v.name}, ${zname(v.zone)}</option>`).join("")}</select></label></div><div id="vp"></div>`;
+};
+function venueInit(){
+  const draw=()=>{
+    const v=active[curVenue],lic=A.tiers[v.type],tot=lic+A.service;
+    const top=artists.slice(0,6).map(a=>({a,p:v.perDay*30*a.share*(1-UNMATCHED)}));
+    $("#vp").innerHTML=`<div class="grid tiles">${tile("This month's bill",naira(tot),"due 5 Nov 2026")}${tile("Licence status",v.status==="tamper"?"Check device":"Covered",v.status==="tamper"?"An agent will contact you":"Valid to 30 Nov 2026",v.status==="tamper"?"dn":"up")}${tile("Songs heard",num(v.perDay*30),"verified this month")}${tile("Device",v.id,v.status==="online"?"Online":"See status")}</div>
+     <div class="grid two"><div class="card"><h2>Your bill</h2><dl class="kv"><dt>Music licence (${v.type} tier)</dt><dd>${naira(lic)}</dd><dt>PlayTrace service</dt><dd>${naira(A.service)}</dd><dt><b>Total</b></dt><dd><b>${naira(tot)}</b></dd></dl><p class="note">The licence goes to the collecting society. Artists are paid from it by verified plays.</p><div class="toolbar"><button class="pri" id="payb">Pay now</button><span class="note" id="payn">Payments are not connected in this placeholder.</span></div></div>
+     <div class="card"><h2>Most played this month</h2><table><thead><tr><th>Artist</th><th class="n">Plays</th></tr></thead><tbody>${top.map(t=>`<tr><td>${t.a.name}</td><td class="n">${num(t.p)}</td></tr>`).join("")}</tbody></table></div></div>`;
+    $("#payb").onclick=()=>{$("#payn").textContent="Demo only: no payment taken."};
+  };
+  $("#vs").value=curVenue;$("#vs").onchange=()=>{curVenue=+$("#vs").value;draw()};draw();
+}
+
+V.platform=()=>head("Platform and status","What is built, what is a placeholder, and the order we build the rest.")+
+ `<div class="grid three">
+  <div class="card"><h2>Built in this preview</h2><ul><li>Operations overview and live feed (simulated)</li><li>Device list with tamper detail</li><li>Zone and agent payouts</li><li>Royalty allocation with editable assumptions</li><li>Artist and venue portal views</li></ul></div>
+  <div class="card"><h2>Placeholder only</h2><ul><li>All data is generated, none is measured</li><li>Licence tiers and splits are not society tariffs</li><li>No payments, logins or real devices</li><li>Recognition accuracy is not yet proven</li></ul></div>
+  <div class="card"><h2>Next builds</h2><ol><li>Device registry and secure enrolment</li><li>Ingest API, mutual TLS, signed OTA</li><li>Fingerprint matching service and library upload</li><li>Play ledger and monthly statements</li><li>Role logins, agent app, venue billing</li></ol></div>
+ </div>
+ <div class="card" style="margin-top:14px"><h2>Planned architecture</h2><div class="flow">
+  <div><b>Device</b><span>ESP32-S3 with LTE and GNSS, music gate, fingerprint, tamper sensors, secure element.</span></div>
+  <div><b>Ingest</b><span>Mutual TLS, per-device keys, offline queue, about 3 to 6 MB a day.</span></div>
+  <div><b>Matcher</b><span>Fingerprint lookup against the registered library, confidence score.</span></div>
+  <div><b>Ledger</b><span>Append-only plays table, one row per verified play.</span></div>
+  <div><b>Statements</b><span>Monthly allocation per artist, label, publisher and agent.</span></div>
+  <div><b>Console</b><span>This dashboard: ops, society, artists, venues.</span></div>
+ </div></div>
+ <div class="card" style="margin-top:14px"><h2>Data rules</h2><p>No raw audio and no speech are stored. Only fingerprints, times and device IDs leave the device. Venues get a notice sign. Privacy follows the Nigeria Data Protection Act 2023.</p></div>`;
+
+/* ---------- live feed ---------- */
+function feedStart(){
+  const el=$("#feed");if(!el)return;
+  let t=new Date(clock0);
+  const add=()=>{
+    t=new Date(t.getTime()+1000*(2+Math.floor(R()*5)));
+    const v=pick(active.filter(x=>x.status==="online")),a=artists[Math.floor(R()*artists.length)];
+    const unm=R()<UNMATCHED;
+    const li=document.createElement("li");
+    li.innerHTML=`<span class="t">${t.toTimeString().slice(0,8)}</span><span>${unm?'<span class="pill p-offline">Unmatched</span> Unknown track':`<b>${a.name}</b>, ${pick(a.tracks)}`}<br><span class="note">${v.name}, ${zname(v.zone)}</span></span>`;
+    el.prepend(li);while(el.children.length>40)el.lastChild.remove();
+    if(!unm){liveCount++;const c=$("#liveTotal");if(c)c.textContent=num(Math.round(daily[DAYS-1]*0.6)+liveCount)}
+  };
+  for(let i=0;i<8;i++)add();
+  feedTimer=setInterval(add,2600);
+}
+
+/* ---------- router ---------- */
+function show(){
+  const h=(location.hash||"#overview").slice(1),k=V[h]?h:"overview";
+  if(feedTimer){clearInterval(feedTimer);feedTimer=null}
+  $("#main").innerHTML=V[k]();
+  document.querySelectorAll(".rail a").forEach(a=>a.toggleAttribute("aria-current",a.dataset.v===k)||0);
+  document.querySelectorAll(".rail a").forEach(a=>{if(a.dataset.v===k)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+  if(k==="overview")feedStart();if(k==="fleet")fleetInit();if(k==="royalties")royInit();if(k==="artist")artistInit();if(k==="venue")venueInit();
+  window.scrollTo(0,0);
+}
+addEventListener("hashchange",show);show();
+</script>
+</body>
+</html>
